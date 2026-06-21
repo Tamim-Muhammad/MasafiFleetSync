@@ -9,6 +9,13 @@ namespace MasafiFleetSync.API.Models
         [Key]
         public int Id { get; set; }
 
+        // --- CRITICAL ARCHITECTURAL FIX: Direct link to originating water order request ---
+        [Required]
+        public int WaterOrderId { get; set; }
+
+        [ForeignKey("WaterOrderId")]
+        public WaterOrder? WaterOrder { get; set; } // Prevents data division across accounting ledgers
+
         [Required]
         public int CustomerId { get; set; } // Link to the User/Customer who placed the water order
 
@@ -48,7 +55,7 @@ namespace MasafiFleetSync.API.Models
         public decimal NetDriverEarnings { get; set; } // Driver's final take-home payout from the route split
 
         // --- Telemetry Monitoring ---
-        public double? CurrentDriverLatitude { get; set; } // Supports mandatory real-time dashboard map views
+        public double? CurrentDriverLatitude { get; set; } // Supports mandatory real-time dashboard map views (Screen 8 Background tasks)
         public double? CurrentDriverLongitude { get; set; }
 
         [Required]

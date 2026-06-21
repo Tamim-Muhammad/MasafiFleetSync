@@ -11,7 +11,7 @@ namespace MasafiFleetSync.API.Models
 
         [Required]
         [StringLength(50)]
-        public string ContractReferenceNo { get; set; } = string.Empty; // e.g., "MFS-RA-2026-0001" supporting US#11 system generations
+        public string ContractReferenceNo { get; set; } = string.Empty; // e.g., "MFS-RA-2026-0001" supporting US#11 contract generations
 
         [Required]
         public int CustomerId { get; set; } // Link to the Customer/Renter account User ID
@@ -27,11 +27,15 @@ namespace MasafiFleetSync.API.Models
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]
-        public decimal TotalPrice { get; set; } // Updated to decimal to maintain enterprise financial transaction precision
+        public decimal DailyRate { get; set; } // Preserves transaction baseline historical pricing context during global rate shifts
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]
-        public decimal SecurityDeposit { get; set; } // Updated to decimal to maintain enterprise financial transaction precision
+        public decimal TotalPrice { get; set; } // Total contract value: (DailyRate * Duration) + Fees
+
+        [Required]
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal SecurityDeposit { get; set; }
 
         [Required]
         [StringLength(50)]
@@ -42,6 +46,6 @@ namespace MasafiFleetSync.API.Models
         public string Status { get; set; } = "Pending"; // Pending, Approved, Active, Completed, Cancelled
 
         [StringLength(255)]
-        public string ContractPdfPath { get; set; } = string.Empty; // Local file path hosting the generated contract layout
+        public string ContractPdfPath { get; set; } = string.Empty; // Local storage file path hosting the generated legal contract PDF layout
     }
 }

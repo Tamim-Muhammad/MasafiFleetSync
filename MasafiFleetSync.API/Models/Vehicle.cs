@@ -24,8 +24,15 @@ namespace MasafiFleetSync.API.Models
         public int Capacity { get; set; } // Stored in Gallons for water distribution matching SRS specs
 
         [Required]
+        [StringLength(50)]
+        public string ChassisNumber { get; set; } = string.Empty;
+
+        [Required]
+        public int YearOfManufacture { get; set; }
+
+        [Required]
         [StringLength(30)]
-        public string Status { get; set; } = "Active"; // Active, In Maintenance, Rented, Out of Service
+        public string Status { get; set; } = "PendingInspection"; // Active, PendingInspection, In Maintenance, Rented
 
         [Required]
         [StringLength(100)]
@@ -39,17 +46,29 @@ namespace MasafiFleetSync.API.Models
         public string MulkiyaNumber { get; set; } = string.Empty; // Essential UAE Registration Card Identifier
 
         [Required]
-        public DateTime RegistrationExpiryDate { get; set; } // Map to Mulkiya Expiry for the 30/15/7 day milestone notifications
+        public DateTime RegistrationExpiryDate { get; set; } // Map to Mulkiya Expiry for the 30/15/7 day notifications
 
-        // Stores the file path of the scanned vehicle registration document for OCR verification (US#6)
+        [Required]
         [StringLength(255)]
-        public string MulkiyaDocumentUrl { get; set; } = string.Empty;
+        public string MulkiyaDocumentUrl { get; set; } = string.Empty; // Scanned document path for OCR processing
+
+        [Required]
+        [StringLength(255)]
+        public string InsuranceDocumentUrl { get; set; } = string.Empty; // Scanned certificate path for OCR processing
+
+        [Required]
+        [StringLength(255)]
+        public string VehiclePhotoUrl { get; set; } = string.Empty; // Captures vehicle asset visuals
 
         [Required]
         [StringLength(30)]
         public string FleetCategory { get; set; } = "Internal"; // Internal (Owned Fleet), Rental Catalog Asset
 
         [Required]
-        public bool IsCompliant { get; set; } = true; // Hard lock flag for simultaneous assignment validation
+        public bool IsCompliant { get; set; } = false; // Sync gate checking background document review status
+
+        // Database-level concurrency token protecting against simultaneous dispatcher assignment conflicts
+        [Timestamp]
+        public byte[] RowVersion { get; set; } = Array.Empty<byte>();
     }
 }
