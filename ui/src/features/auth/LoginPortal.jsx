@@ -15,7 +15,15 @@ const LoginPortal = () => {
           alt="Al-Waqar Fleet" 
           className="w-full h-full object-cover opacity-90" 
         />
-        <div className="absolute inset-0 bg-black/20" />
+        {/* Top-Left Anchored Professional Text Overlay */}
+        <div className="absolute inset-0 bg-black/30 flex flex-col justify-start pt-24 px-12 text-white">
+          <h1 className="text-4xl font-bold mb-4 leading-tight">
+            FLEET SYNCHRONIZATION<br />PLATFORM
+          </h1>
+          <p className="text-xl max-w-sm font-light text-gray-200">
+            Real-time logistics management and asset compliance for the Al-Waqar Transport network.
+          </p>
+        </div>
       </div>
 
       {/* Login Form Container */}
