@@ -7,7 +7,7 @@ import heroBg from '../../../assets/images/hero-bg.png';
 const Hero = () => {
   return (
     <section 
-      className="relative py-24 px-8 text-center bg-cover bg-center bg-no-repeat font-sans"
+      className="relative py-48 px-8 text-center bg-cover bg-center bg-no-repeat font-sans"
       style={{ backgroundImage: `linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${heroBg})` }}
     >
       <div className="relative z-10 max-w-5xl mx-auto">
@@ -29,7 +29,7 @@ const Hero = () => {
               </div>
               <img src={tankerIcon} alt="Water Tanker" className="h-20 w-auto object-contain flex-shrink-0" />
             </div>
-            <Link to="/order" className="w-full block px-8 py-4 bg-[#2D4552] text-white rounded-xl font-bold hover:bg-[#1a2831] transition text-center text-lg">
+            <Link to="/login" className="w-full block px-8 py-4 bg-[#2D4552] text-white rounded-xl font-bold hover:bg-[#1a2831] transition text-center text-lg">
               Order Tanker Now
             </Link>
           </div>
@@ -42,7 +42,7 @@ const Hero = () => {
               </div>
               <img src={excavatorIcon} alt="Heavy Fleet" className="h-20 w-auto object-contain flex-shrink-0" />
             </div>
-            <Link to="/rentals" className="w-full block px-8 py-4 bg-[#2D4552] text-white rounded-xl font-bold hover:bg-[#1a2831] transition text-center text-lg">
+            <Link to="/login" className="w-full block px-8 py-4 bg-[#2D4552] text-white rounded-xl font-bold hover:bg-[#1a2831] transition text-center text-lg">
               Browse Rental Showroom
             </Link>
           </div>

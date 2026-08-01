@@ -2,48 +2,47 @@ import React from 'react';
 
 const EmergencySection = () => {
   return (
-    <section className="py-16 px-8 bg-[#1e2f38] text-white">
-      <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-10">
+    <footer className="bg-[#1e2f38] text-white">
+      {/* Main Footer Block */}
+      <div className="py-12 px-8 max-w-6xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-10">
         
-        {/* Left: Balanced Typography */}
-        <div className="flex-1 text-center lg:text-left">
-          {/* Reduced from font-black to font-bold for a more professional, less "noisy" feel */}
-          <h3 className="text-3xl font-bold text-white mb-3">
-            Roadside Emergency?
-          </h3>
-          <p className="text-blue-100 text-lg opacity-80 max-w-sm mx-auto lg:mx-0 leading-relaxed">
+        {/* Left: Text - Keep it clear and left-aligned */}
+        <div className="flex-1">
+          <h3 className="text-2xl font-bold mb-2">Roadside Emergency?</h3>
+          <p className="text-blue-100 text-sm opacity-80 leading-relaxed">
             Our specialized heavy-duty recovery team is on standby 24/7 across the Masafi/Fujairah region.
           </p>
         </div>
 
-        {/* Middle: Clean Icons with proper spacing */}
-        <div className="flex gap-8 text-xs font-semibold uppercase tracking-wider text-blue-200">
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-2xl opacity-90">⚡</span>
-            <span>Fast Dispatch</span>
+        {/* Center: Icons - Use a tighter grid */}
+        <div className="flex gap-8 text-center">
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-xl">⚡</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Fast Dispatch</span>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-2xl opacity-90">🛡️</span>
-            <span>Certified Crew</span>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-xl">🛡️</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Certified Crew</span>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-2xl opacity-90">🕒</span>
-            <span>24/7 Service</span>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-xl">🕒</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200">24/7 Service</span>
           </div>
         </div>
 
         {/* Right: Button */}
-        <div className="flex-1 flex justify-center lg:justify-end">
-          <a 
-            href="tel:+971XXXXXXXXX" 
-            className="flex items-center gap-3 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-all duration-300 shadow-md text-lg"
-          >
-            <span>📞</span> 
-            Call +971-XX-XXXXXXX
+        <div className="flex-1 flex justify-end">
+          <a href="tel:+971XXXXXXXXX" className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-bold transition flex items-center gap-2">
+            <span>📞</span> Call 800-ALWAQAR
           </a>
         </div>
       </div>
-    </section>
+
+      {/* The "Anchor" Strip - This fixes your white screen issue! */}
+      <div className="bg-[#17252d] py-4 text-center text-[10px] text-gray-500 uppercase tracking-widest">
+        © 2026 Al-Waqar Transport L.L.C. All rights reserved.
+      </div>
+    </footer>
   );
 };
 
