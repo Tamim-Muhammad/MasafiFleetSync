@@ -13,9 +13,22 @@ import AboutUsPage from './pages/AboutUsPage';
 import FAQPage from './pages/FAQPage';
 import ContactPage from './pages/ContactPage';
 
-// Dashboard
+// Customer Dashboard
 import CustomerDashboardLayout from './features/customerDashboard/CustomerDashboardLayout';
 import CustomerDashboardHome from './features/customerDashboard/CustomerDashboardHome';
+
+// Driver Dashboard & Sub-pages
+import DriverDashboardLayout from './features/driverDashboard/DriverDashboardLayout';
+import DriverDashboardHome from './features/driverDashboard/DriverDashboardHome';
+import DriverAssignmentDetails from './features/driverDashboard/DriverAssignmentDetails';
+import DriverComplianceDetails from './features/driverDashboard/DriverComplianceDetails';
+import DriverEarnings from './features/driverDashboard/DriverEarnings';
+import DriverSchedule from './features/driverDashboard/DriverSchedule';
+import DeliveriesHistory from './features/driverDashboard/DeliveriesHistory';
+import DriverDocuments from './features/driverDashboard/DriverDocuments';
+import DriverVehicleProfile from './features/driverDashboard/DriverVehicleProfile';
+import DriverSupport from './features/driverDashboard/DriverSupport';
+import DriverSettings from './features/driverDashboard/DriverSettings';
 
 // 1. Create a Layout wrapper for pages that NEED the Navbar
 const PublicLayout = ({ children }) => (
@@ -48,8 +61,21 @@ function App() {
             <Route index element={<CustomerDashboardHome />} />
           </Route>
 
+          {/* Driver Dashboard Routes */}
+          <Route path="/driver" element={<DriverDashboardLayout />}>
+            <Route path="dashboard" element={<DriverDashboardHome />} />
+            <Route path="assignments" element={<DriverAssignmentDetails />} />
+            <Route path="compliance" element={<DriverComplianceDetails />} />
+            <Route path="earnings" element={<DriverEarnings />} />
+            <Route path="schedule" element={<DriverSchedule />} />
+            <Route path="history" element={<DeliveriesHistory />} />
+            <Route path="documents" element={<DriverDocuments />} />
+            <Route path="vehicle-profile" element={<DriverVehicleProfile />} />
+            <Route path="support" element={<DriverSupport />} />
+            <Route path="settings" element={<DriverSettings />} />
+          </Route>
+
           {/* Other Modules */}
-          <Route path="/driver/dashboard" element={<div className="p-10">Driver Dashboard</div>} />
           <Route path="/forgot-password" element={<div className="p-10">Password Recovery</div>} />
         </Routes>
       </div>

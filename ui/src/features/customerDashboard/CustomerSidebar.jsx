@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import logoImage from '../../assets/logo/logo.png';
 import { 
   LayoutDashboard, 
   Droplets, 
@@ -45,7 +46,7 @@ const CustomerSidebar = () => {
               to={item.path}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  isActive ? 'bg-[#1e4a7d] text-white' : 'text-gray-300 hover:bg-[#1e4a7d] hover:text-white'
+                  isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/15' : 'text-gray-300 hover:bg-[#1e4a7d] hover:text-white'
                 }`
               }
             >
