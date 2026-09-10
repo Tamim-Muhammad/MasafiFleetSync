@@ -10,13 +10,22 @@ namespace MasafiFleetSync.API.Models
         public int Id { get; set; }
 
         [Required]
-        public int CustomerId { get; set; } // Foreign Key link to the Customer account User ID
+        public int CustomerId { get; set; }
 
-        public int? AssignedVehicleId { get; set; } // Nullable until dispatcher assigns an available asset on Screen 20
+        [Required]
+        public int VolumeGallons { get; set; } = 5000;
 
-        public int? AssignedDriverId { get; set; }  // Nullable until dispatcher pairs a compliant driver
+        public int? AssignedVehicleId { get; set; }
+        public int? AssignedDriverId { get; set; }
 
-        // Explicit decimal precision parameters to protect Google Maps pin coordinate accuracy (6 decimal places)
+        [Required]
+        [StringLength(255)]
+        public string DeliveryAddress { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(50)]
+        public string CustomerPhone { get; set; } = string.Empty;
+
         [Required]
         [Column(TypeName = "decimal(9, 6)")]
         public decimal TargetLatitude { get; set; }
@@ -25,35 +34,39 @@ namespace MasafiFleetSync.API.Models
         [Column(TypeName = "decimal(9, 6)")]
         public decimal TargetLongitude { get; set; }
 
+        [Column(TypeName = "decimal(9, 6)")]
+        public decimal? CurrentLatitude { get; set; }
+
+        [Column(TypeName = "decimal(9, 6)")]
+        public decimal? CurrentLongitude { get; set; }
+
         [Required]
         [Column(TypeName = "decimal(18, 2)")]
-        public decimal CalculatedDistanceKm { get; set; } // Calculated natively via Google Distance Matrix API for pricing calculation
+        public decimal CalculatedDistanceKm { get; set; }
 
-        // Core business pricing matrix breakdown matching your formula [Base + (Distance * Per-Km) * Volume]
         [Required]
         [Column(TypeName = "decimal(18, 2)")]
         public decimal GrossAmountAED { get; set; }
 
         [Required]
         [Column(TypeName = "decimal(18, 2)")]
-        public decimal CommissionDeductionAED { get; set; } // Globally configured corporate commission deduction percentage
+        public decimal CommissionDeductionAED { get; set; }
 
         [Required]
         [Column(TypeName = "decimal(18, 2)")]
-        public decimal DriverNetEarningsAED { get; set; } // Owed payouts to track on Driver Earnings Ledger (Screen 9)
-
-        // Handles your rigid 3-state physical hand-to-hand cash custody lifecycle flow (Screen 24)
-        [Required]
-        [StringLength(30)]
-        public string CustodyStatus { get; set; } = "PendingCollection"; // PendingCollection, CollectedByDriver, SettledAndReconciled
+        public decimal DriverNetEarningsAED { get; set; }
 
         [Required]
         [StringLength(30)]
-        public string OrderStatus { get; set; } = "Pending"; // Pending, Accepted, EnRoute, Arrived, Completed, Cancelled
+        public string CustodyStatus { get; set; } = "PendingCollection";
+
+        [Required]
+        [StringLength(30)]
+        public string OrderStatus { get; set; } = "Pending";
 
         [Required]
         public DateTime OrderTimestamp { get; set; } = DateTime.UtcNow;
 
-        public DateTime? HandoverTimestamp { get; set; } // Logged timestamp once cash is hand-to-hand balanced in the yard
+        public DateTime? HandoverTimestamp { get; set; }
     }
 }

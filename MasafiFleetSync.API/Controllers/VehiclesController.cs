@@ -1,9 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MasafiFleetSync.API.Data;
 using MasafiFleetSync.API.Models;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace MasafiFleetSync.API.Controllers
 {
@@ -13,38 +14,34 @@ namespace MasafiFleetSync.API.Controllers
     {
         private readonly AppDbContext _context;
 
-        // Dependency Injection: Injecting our verified AppDbContext database hub
         public VehiclesController(AppDbContext context)
         {
             _context = context;
         }
 
-        // 1. GET: api/Vehicles (Fetch all fleet assets)
+        // 1. GET: api/Vehicles
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehicles()
         {
             return await _context.Vehicles.ToListAsync();
         }
 
-        // 2. GET: api/Vehicles/5 (Fetch a single vehicle asset by its Primary Key)
+        // 2. GET: api/Vehicles/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Vehicle>> GetVehicle(int id)
         {
             var vehicle = await _context.Vehicles.FindAsync(id);
-
             if (vehicle == null)
             {
                 return NotFound(new { message = $"Vehicle with ID {id} not found." });
             }
-
             return vehicle;
         }
 
-        // 3. POST: api/Vehicles (Add a brand new vehicle to the registry)
+        // 3. POST: api/Vehicles
         [HttpPost]
         public async Task<ActionResult<Vehicle>> PostVehicle(Vehicle vehicle)
         {
-            // Simple validation: Avoid duplicate license plates in the active fleet
             bool exists = await _context.Vehicles.AnyAsync(v => v.VehicleNumber == vehicle.VehicleNumber);
             if (exists)
             {
@@ -57,15 +54,11 @@ namespace MasafiFleetSync.API.Controllers
             return CreatedAtAction(nameof(GetVehicle), new { id = vehicle.Id }, vehicle);
         }
 
-        // 4. PUT: api/Vehicles/5 (Update registration, status, or structural details)
+        // 4. PUT: api/Vehicles/5
         [HttpPut("{id}")]
         public async Task<IActionResult> PutVehicle(int id, Vehicle vehicle)
         {
-            if (id != vehicle.Id)
-            {
-                return BadRequest(new { message = "ID mismatch between route parameter and vehicle body data." });
-            }
-
+            id = vehicle.Id; // Safety guard for route vs body mismatches
             _context.Entry(vehicle).State = EntityState.Modified;
 
             try
@@ -84,7 +77,37 @@ namespace MasafiFleetSync.API.Controllers
             return Ok(new { message = "Vehicle asset updated successfully." });
         }
 
-        // 5. DELETE: api/Vehicles/5 (Decommission or remove a vehicle from tracking)
+        // 5. PUT: api/Vehicles/5/blockade (Enforce or Lift Regulatory Blockade)
+        [HttpPut("{id}/blockade")]
+        public async Task<IActionResult> ToggleBlockade(int id)
+        {
+            var vehicle = await _context.Vehicles.FindAsync(id);
+            if (vehicle == null)
+            {
+                return NotFound(new { message = $"Vehicle with ID {id} not found." });
+            }
+
+            if (string.Equals(vehicle.Status, "Blockaded", StringComparison.OrdinalIgnoreCase))
+            {
+                vehicle.Status = "Available";
+                vehicle.IsCompliant = true;
+            }
+            else
+            {
+                vehicle.Status = "Blockaded";
+                vehicle.IsCompliant = false;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new
+            {
+                message = $"Vehicle {vehicle.VehicleNumber} status successfully updated to {vehicle.Status}.",
+                status = vehicle.Status,
+                isCompliant = vehicle.IsCompliant
+            });
+        }
+
+        // 6. DELETE: api/Vehicles/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteVehicle(int id)
         {

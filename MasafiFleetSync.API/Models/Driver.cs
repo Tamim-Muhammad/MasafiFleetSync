@@ -26,7 +26,7 @@ namespace MasafiFleetSync.API.Models
         [Required]
         public string Otp { get; set; } = string.Empty;
 
-        // --- Step 2: Legal Driving Credentials ---
+        // --- Legal Driving Credentials ---
         [Required]
         [StringLength(50)]
         public string LicenseNumber { get; set; } = string.Empty;
@@ -38,7 +38,7 @@ namespace MasafiFleetSync.API.Models
         [StringLength(100)]
         public string LicenseIssuingAuthority { get; set; } = "Fujairah_RTA";
 
-        // --- Step 3: Vehicle Specifications ---
+        // --- Vehicle Specifications ---
         [Required]
         [StringLength(100)]
         public string VehicleAssignment { get; set; } = string.Empty;
@@ -51,14 +51,26 @@ namespace MasafiFleetSync.API.Models
         [StringLength(100)]
         public string ChassisNumber { get; set; } = string.Empty;
 
-        // --- Step 4: Compliance Certificate File Paths ---
+        // --- Document Vault & Profile Tracking ---
         [Required]
         [StringLength(255)]
-        public string DrivingLicenseDocumentUrl { get; set; } = string.Empty;
+        public string ProfileImage { get; set; } = "default_profile.png";
 
         [Required]
         [StringLength(255)]
-        public string DocumentCopyUrl { get; set; } = string.Empty;
+        public string DrivingLicenseDocumentUrl { get; set; } = "license_document.pdf";
+
+        [Required]
+        [StringLength(255)]
+        public string MulkiyaDocumentUrl { get; set; } = "mulkiya_certificate.pdf";
+
+        [Required]
+        [StringLength(255)]
+        public string InsuranceDocumentUrl { get; set; } = "insurance_policy.pdf";
+
+        [Required]
+        [StringLength(255)]
+        public string PhotosDocumentUrl { get; set; } = "fleet_asset_photo.png";
 
         // --- Operational & Compliance States ---
         [Required]

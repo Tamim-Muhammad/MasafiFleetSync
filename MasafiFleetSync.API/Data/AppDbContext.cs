@@ -15,8 +15,9 @@ namespace MasafiFleetSync.API.Data
         public DbSet<Vehicle> Vehicles { get; set; }
 
         // --- Module 1: Water Tanker Scheduling (LMS) ---
-        public DbSet<WaterOrder> WaterOrders { get; set; } // FIX: Registered missing core order table
+        public DbSet<WaterOrder> WaterOrders { get; set; }
         public DbSet<Trip> Trips { get; set; }
+        public DbSet<DeliveryRecord> DeliveryRecords { get; set; } // Added Delivery History Registry
 
         // --- Module 2: Driver & Vehicle Registration (Compliance) ---
         public DbSet<Alert> Alerts { get; set; }
@@ -24,11 +25,15 @@ namespace MasafiFleetSync.API.Data
         // --- Module 3: Vehicle Rental Management ---
         public DbSet<RentalAgreement> RentalAgreements { get; set; }
 
-        // --- Module 4: Recovery Dispatch (On-Call) ---
+        // --- Module 4: Recovery Dispatch & SOS (On-Call) ---
         public DbSet<Breakdown> Breakdowns { get; set; }
+        public DbSet<EmergencyIncident> EmergencyIncidents { get; set; }
 
         // --- Central Admin Pricing & Operations Controls ---
         public DbSet<SystemConfig> SystemConfigs { get; set; }
+
+        // --- Customer Notifications Registry ---
+        public DbSet<Notification> Notifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -47,7 +52,7 @@ namespace MasafiFleetSync.API.Data
                 .HasIndex(v => v.VehicleNumber)
                 .IsUnique();
 
-            // 2. Lock explicit precision boundaries protecting spatial coordinates accuracy
+            // 2. Lock explicit precision boundaries protecting spatial coordinates and financial amounts accuracy
             modelBuilder.Entity<WaterOrder>()
                 .Property(o => o.TargetLatitude)
                 .HasPrecision(9, 6);
@@ -63,6 +68,10 @@ namespace MasafiFleetSync.API.Data
             modelBuilder.Entity<Breakdown>()
                 .Property(b => b.IncidentLongitude)
                 .HasPrecision(9, 6);
+
+            modelBuilder.Entity<DeliveryRecord>()
+                .Property(d => d.Amount)
+                .HasPrecision(18, 2);
 
             // 3. Configure DB optimistic concurrency handling token for simultaneous operator requests
             modelBuilder.Entity<Vehicle>()

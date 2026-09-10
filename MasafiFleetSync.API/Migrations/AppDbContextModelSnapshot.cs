@@ -142,6 +142,54 @@ namespace MasafiFleetSync.API.Migrations
                     b.ToTable("Breakdowns");
                 });
 
+            modelBuilder.Entity("MasafiFleetSync.API.Models.DeliveryRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ClientName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DriverId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("JobReference")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("ServiceDescription")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DeliveryRecords");
+                });
+
             modelBuilder.Entity("MasafiFleetSync.API.Models.Driver", b =>
                 {
                     b.Property<int>("Id")
@@ -160,11 +208,6 @@ namespace MasafiFleetSync.API.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
-                    b.Property<string>("DocumentCopyUrl")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
                     b.Property<string>("DrivingLicenseDocumentUrl")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -180,6 +223,11 @@ namespace MasafiFleetSync.API.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("InsuranceDocumentUrl")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<DateTime>("LicenseExpiryDate")
                         .HasColumnType("datetime2");
 
@@ -192,6 +240,11 @@ namespace MasafiFleetSync.API.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("MulkiyaDocumentUrl")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -207,10 +260,20 @@ namespace MasafiFleetSync.API.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("PhotosDocumentUrl")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<string>("PlateNumber")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ProfileImage")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -227,6 +290,83 @@ namespace MasafiFleetSync.API.Migrations
                     b.ToTable("Drivers");
                 });
 
+            modelBuilder.Entity("MasafiFleetSync.API.Models.EmergencyIncident", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EmergencyType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IncidentNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RelatedOrder")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RelatedVehicle")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReportedByUserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EmergencyIncidents");
+                });
+
+            modelBuilder.Entity("MasafiFleetSync.API.Models.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Notifications");
+                });
+
             modelBuilder.Entity("MasafiFleetSync.API.Models.RentalAgreement", b =>
                 {
                     b.Property<int>("Id")
@@ -234,6 +374,16 @@ namespace MasafiFleetSync.API.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("ContactPhone")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<string>("ContractPdfPath")
                         .IsRequired()
@@ -253,14 +403,27 @@ namespace MasafiFleetSync.API.Migrations
 
                     b.Property<string>("DepositStatus")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsDriverCertified")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ProjectSite")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<decimal>("SecurityDeposit")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("SignatoryName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime2");
@@ -272,6 +435,16 @@ namespace MasafiFleetSync.API.Migrations
 
                     b.Property<decimal>("TotalPrice")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("TradeLicenseNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("VehicleCategory")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("VehicleId")
                         .HasColumnType("int");
@@ -292,6 +465,9 @@ namespace MasafiFleetSync.API.Migrations
                     b.Property<double>("AllowedRadiusKm")
                         .HasColumnType("float");
 
+                    b.Property<bool>("AutoBackupEnabled")
+                        .HasColumnType("bit");
+
                     b.Property<decimal>("BaseRate")
                         .HasColumnType("decimal(18,2)");
 
@@ -303,6 +479,14 @@ namespace MasafiFleetSync.API.Migrations
 
                     b.Property<decimal>("CompanyCommissionPercentage")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ComplianceAlertThreshold")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("GeofenceZone")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("PerKmRate")
                         .HasColumnType("decimal(18,2)");
@@ -560,6 +744,12 @@ namespace MasafiFleetSync.API.Migrations
                     b.Property<decimal>("CommissionDeductionAED")
                         .HasColumnType("decimal(18, 2)");
 
+                    b.Property<decimal?>("CurrentLatitude")
+                        .HasColumnType("decimal(9, 6)");
+
+                    b.Property<decimal?>("CurrentLongitude")
+                        .HasColumnType("decimal(9, 6)");
+
                     b.Property<string>("CustodyStatus")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -567,6 +757,16 @@ namespace MasafiFleetSync.API.Migrations
 
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
+
+                    b.Property<string>("CustomerPhone")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("DeliveryAddress")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
                     b.Property<decimal>("DriverNetEarningsAED")
                         .HasColumnType("decimal(18, 2)");
@@ -592,6 +792,9 @@ namespace MasafiFleetSync.API.Migrations
                     b.Property<decimal>("TargetLongitude")
                         .HasPrecision(9, 6)
                         .HasColumnType("decimal(9, 6)");
+
+                    b.Property<int>("VolumeGallons")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 

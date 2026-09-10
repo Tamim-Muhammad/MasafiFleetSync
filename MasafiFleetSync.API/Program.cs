@@ -3,6 +3,11 @@ using MasafiFleetSync.API.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.IdentityModel.Tokens.Jwt;
+
+// FIX: Force ASP.NET to stop mangling standard JWT claim names into XML schemas. 
+// This immediately resolves the silent 401 Unauthorized errors across all [Authorize] controllers.
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +20,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactApp",
         policy => policy.WithOrigins("http://localhost:5173")
                         .AllowAnyMethod()
-                        .AllowAnyHeader());
+                        .AllowAnyHeader()
+                        .AllowCredentials());
 });
 
 // 2. JWT AUTHENTICATION CONFIGURATION
@@ -30,7 +36,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            // Using ?? to provide a fallback and prevent null reference warnings
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
                 builder.Configuration["Jwt:Key"] ?? "YourSuperSecretKeyMustBeAtLeast32CharactersLong"))
         };
@@ -43,6 +48,9 @@ builder.Services.AddSwaggerGen();
 // REGISTER DATABASE
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// REGISTER BACKGROUND COMPLIANCE WORKER
+builder.Services.AddHostedService<MasafiFleetSync.API.Services.ComplianceBackgroundService>();
 
 var app = builder.Build();
 
@@ -70,6 +78,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// CRITICAL: Must enable static files so http://localhost:5191/uploads/... can serve images/PDFs
+app.UseStaticFiles();
 
 // MIDDLEWARE ORDER IS CRITICAL
 app.UseCors("AllowReactApp");

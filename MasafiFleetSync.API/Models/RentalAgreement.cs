@@ -11,13 +11,17 @@ namespace MasafiFleetSync.API.Models
 
         [Required]
         [StringLength(50)]
-        public string ContractReferenceNo { get; set; } = string.Empty; // e.g., "MFS-RA-2026-0001" supporting US#11 contract generations
+        public string ContractReferenceNo { get; set; } = string.Empty;
 
         [Required]
-        public int CustomerId { get; set; } // Link to the Customer/Renter account User ID
+        public int CustomerId { get; set; }
 
         [Required]
-        public int VehicleId { get; set; } // Link to the rented Tanker/Vehicle asset ID
+        public int VehicleId { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        public string VehicleCategory { get; set; } = string.Empty; // Captures exact asset name selected by customer
 
         [Required]
         public DateTime StartDate { get; set; }
@@ -27,25 +31,47 @@ namespace MasafiFleetSync.API.Models
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]
-        public decimal DailyRate { get; set; } // Preserves transaction baseline historical pricing context during global rate shifts
+        public decimal DailyRate { get; set; }
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]
-        public decimal TotalPrice { get; set; } // Total contract value: (DailyRate * Duration) + Fees
+        public decimal TotalPrice { get; set; }
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]
         public decimal SecurityDeposit { get; set; }
 
         [Required]
-        [StringLength(50)]
-        public string DepositStatus { get; set; } = "Paid"; // Paid, Refunded, RetainedForDamages (BRD Section 4.5)
+        [StringLength(100)]
+        public string DepositStatus { get; set; } = "Paid";
 
         [Required]
         [StringLength(30)]
-        public string Status { get; set; } = "Pending"; // Pending, Approved, Active, Completed, Cancelled
+        public string Status { get; set; } = "Pending";
 
         [StringLength(255)]
-        public string ContractPdfPath { get; set; } = string.Empty; // Local storage file path hosting the generated legal contract PDF layout
+        public string ContractPdfPath { get; set; } = string.Empty;
+
+        // --- B2B Commercial Lessee Fields ---
+        [Required]
+        [StringLength(150)]
+        public string CompanyName { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(50)]
+        public string TradeLicenseNo { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(30)]
+        public string ContactPhone { get; set; } = string.Empty;
+
+        [StringLength(100)]
+        public string SignatoryName { get; set; } = string.Empty;
+
+        [StringLength(150)]
+        public string ProjectSite { get; set; } = string.Empty;
+
+        [Required]
+        public bool IsDriverCertified { get; set; }
     }
 }

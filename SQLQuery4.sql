@@ -1,0 +1,2 @@
+﻿ALTER TABLE RentalAgreements 
+ALTER COLUMN DepositStatus VARCHAR(150) NOT NULL;
