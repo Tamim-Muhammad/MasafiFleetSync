@@ -16,20 +16,40 @@ const LoginPortal = () => {
     e.preventDefault();
     
     try {
-      // Sending 'email' as the key to your backend
-      // Note: If your backend needs to distinguish between phone and email, 
-      // you would need to adjust the backend logic to handle both keys.
+      // Sending 'Email' and 'Password' with capital letters to match C# LoginRequest.cs model
       const response = await axios.post('http://localhost:5191/api/Auth/login', {
-        email: identifier, // 'identifier' holds the email or phone input
-        password: password
+        Email: identifier, // Maps to LoginRequest.Email
+        Password: password // Maps to LoginRequest.Password
       });
 
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('role', response.data.role);
+      // Clear any existing session in this specific tab to ensure a clean slate
+      sessionStorage.clear();
+
+      // USE SESSION STORAGE (Tab-Isolated) INSTEAD OF LOCAL STORAGE (Global)
+      sessionStorage.setItem('token', response.data.token);
+      sessionStorage.setItem('role', response.data.role);
+      
+      // Save user object so headers and layouts know the exact ID
+      if (response.data.user) {
+        sessionStorage.setItem('user', JSON.stringify(response.data.user));
+      }
 
       console.log('Login successful:', response.data.message);
       
-      navigate(response.data.role === 'Admin' ? '/admin/dashboard' : '/customer/dashboard');
+      // Dynamic role-based redirection matching all system roles
+      const role = (response.data.role || '').toLowerCase();
+      
+      if (
+        role.includes('admin') || 
+        role.includes('operator') || 
+        role.includes('manager')
+      ) {
+        navigate('/admin/dashboard');
+      } else if (role.includes('driver')) {
+        navigate('/driver/dashboard');
+      } else {
+        navigate('/customer/dashboard');
+      }
       
     } catch (error) {
       alert(error.response?.data?.message || "Login failed. Please check your credentials.");
@@ -101,7 +121,7 @@ const LoginPortal = () => {
 
             <button 
               type="submit" 
-              className="w-full bg-[#2F5673] text-white py-3.5 rounded-lg font-bold text-lg hover:bg-[#1F3A4D] transition duration-200 shadow-md"
+              className="w-full bg-[#2F5673] text-white py-3.5 rounded-lg font-bold text-lg hover:bg-[#1F3A4D] transition duration-200 shadow-md cursor-pointer"
             >
               Sign In
             </button>

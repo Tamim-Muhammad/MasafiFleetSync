@@ -8,12 +8,9 @@ import {
   MapPin, 
   Calendar, 
   Search, 
-  Filter, 
   ArrowUpRight,
   Droplets,
-  Key,
   X,
-  SlidersHorizontal,
   ShieldCheck,
   Navigation,
   PackageOpen
@@ -24,371 +21,310 @@ const CustomerMyOrders = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Tabs & Controls State
-  const [activeTab, setActiveTab] = useState('water');
+  // Controls State
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'pending' | 'completed'
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'pending' | 'completed'
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
 
   // Live Database Orders State
   const [waterOrders, setWaterOrders] = useState([]);
-  const [rentalOrders, setRentalOrders] = useState([]);
 
-  // Sync state with incoming URL query parameters when clicking dashboard metrics cards
+  // Sync filter state with incoming URL query parameters
   useEffect(() => {
-    const tabParam = searchParams.get('tab');
     const statusParam = searchParams.get('status');
-
-    if (tabParam) {
-      setActiveTab(tabParam);
-    }
     if (statusParam) {
       setStatusFilter(statusParam);
     }
   }, [searchParams]);
 
-  // Fetch actual water orders and vehicle rentals from backend database on mount
+  // --- BULLETPROOF TOKEN EXTRACTOR ---
+  const getAuthToken = () => {
+    const storedUser = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+    return localStorage.getItem('token') || 
+           sessionStorage.getItem('token') || 
+           localStorage.getItem('jwt') || 
+           localStorage.getItem('userToken') || 
+           storedUser.token;
+  };
+
+  // Fetch actual water orders from backend database on mount with token authorization
   useEffect(() => {
-    // 1. Fetch Water Orders
-    fetch('http://localhost:3000/orders')
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const formattedOrders = data.map((item) => ({
-            id: item.id ? `WTR-2026-${item.id.slice(-3).toUpperCase()}` : 'WTR-2026-942',
-            date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Aug 02, 2026',
-            volume: `${item.volume || item.volumeGallons || 5000} Gallons Tanker`,
-            destination: item.deliveryAddress || 'Masafi Central Yard Delivery Zone',
-            cost: item.price ? Number(item.price).toFixed(2) : '157.00',
-            status: item.status ? item.status.toLowerCase() : 'pending',
-            driverName: item.driverName || 'Ahmed Al-Mazrouei',
-            vehiclePlate: item.vehiclePlate || 'F-92814',
-            distance: '2 km from Yard',
-            paymentMethod: 'Cash on Delivery (COD)'
-          }));
-          setWaterOrders(formattedOrders);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch backend orders:', err);
-      });
+    const fetchWaterOrders = async () => {
+      try {
+        const token = getAuthToken();
+        if (!token) return; // Fail gracefully if not logged in
 
-    // 2. Fetch Live Vehicle Rentals from Backend
-    fetch('http://localhost:3000/rentals')
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const formattedRentals = data.map((item) => {
-            const start = new Date(item.startDate);
-            const end = new Date(item.endDate);
-            const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-            const durationDays = diffDays > 0 ? diffDays : 30;
-
-            return {
-              id: item.id ? `RNT-2026-${item.id.slice(-3).toUpperCase()}` : 'RNT-2026-110',
-              date: item.startDate ? new Date(item.startDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Aug 01, 2026',
-              vehicle: item.vehicle?.name || item.vehicleCategory || 'Heavy Water Tanker Truck',
-              duration: `${durationDays} Days Lease`,
-              cost: item.totalPrice ? Number(item.totalPrice).toFixed(2) : '3,500.00',
-              status: item.status ? item.status.toLowerCase() : 'active',
-              contractId: item.id ? `CNT-${item.id.slice(-5).toUpperCase()}` : 'CNT-99412',
-              deposit: item.depositStatus === 'Verified' ? 'AED 1,000.00 (Verified)' : 'AED 1,000.00 (Held)'
-            };
-          });
-          setRentalOrders(formattedRentals);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch backend rentals, falling back to mock data', err);
-        setRentalOrders([
-          {
-            id: 'RNT-2026-110',
-            date: 'Aug 01, 2026',
-            vehicle: 'Heavy Water Tanker Truck (10,000L)',
-            duration: '30 Days Lease',
-            cost: '3,500.00',
-            status: 'active',
-            contractId: 'CNT-99412',
-            deposit: 'AED 1,000.00 (Held)'
+        const res = await fetch('http://localhost:5191/api/WaterOrders/my-orders', {
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
-        ]);
-      });
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const formattedOrders = data.map((item) => {
+              const rawId = item.id || item.Id || 1;
+              const gross = item.grossAmountAED ?? item.GrossAmountAED ?? 525;
+              
+              // CRITICAL FIX: Trim whitespace and safely lowercase to prevent filter mismatch bugs
+              const rawStat = item.orderStatus || item.OrderStatus || 'Pending';
+              const stat = String(rawStat).trim().toLowerCase();
+
+              return {
+                id: `ORD-${rawId}`,
+                rawId: rawId,
+                date: item.orderTimestamp ? new Date(item.orderTimestamp).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Aug 02, 2026',
+                volume: gross > 400 ? '5,000 Gallons Tanker' : '1,000 Gallons Tanker',
+                destination: item.deliveryAddress || item.DeliveryAddress || 'Masafi Central Yard Delivery Zone',
+                cost: Number(gross).toFixed(2),
+                status: stat,
+                driverName: item.driverName || (item.assignedDriverId ? `Driver ID: ${item.assignedDriverId}` : 'Awaiting Dispatch'),
+                vehiclePlate: item.assignedVehicleId ? `Vehicle #${item.assignedVehicleId}` : 'Unassigned',
+                distance: `${item.calculatedDistanceKm || item.CalculatedDistanceKm || 5.0} km from Yard`,
+                paymentMethod: 'Cash on Delivery (COD)'
+              };
+            });
+            
+            // Sort by newest first
+            const sortedOrders = formattedOrders.sort((a, b) => b.rawId - a.rawId);
+            setWaterOrders(sortedOrders);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch backend water orders:', err);
+      }
+    };
+
+    fetchWaterOrders();
   }, []);
 
-  // Filtered Logic for Water Deliveries
+  // Filtered Logic with ordered matching and robust status arrays
   const filteredWaterOrders = waterOrders.filter(order => {
-    const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) || order.destination.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter || (statusFilter === 'pending' && order.status === 'active');
+    const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          order.destination.toLowerCase().includes(searchQuery.toLowerCase());
+      
+    let matchesStatus = true;
+    if (statusFilter === 'active') {
+      matchesStatus = ['accepted', 'dispatched', 'enroute', 'arrived'].includes(order.status);
+    } else if (statusFilter === 'pending') {
+      matchesStatus = ['pending', 'pending review', 'scheduled'].includes(order.status);
+    } else if (statusFilter === 'completed') {
+      matchesStatus = ['completed', 'pending collection'].includes(order.status);
+    }
+
     return matchesSearch && matchesStatus;
   });
 
-  // Filtered Logic for Vehicle Leases
-  const filteredRentalOrders = rentalOrders.filter(order => {
-    const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) || order.vehicle.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter || (statusFilter === 'pending' && order.status === 'active');
-    return matchesSearch && matchesStatus;
-  });
+  // Real Receipt Downloader Function
+  const handleDownloadReceipt = (order) => {
+    const receiptText = `=====================================================
+            AL-WAQAR TRANSPORT L.L.C.
+         OFFICIAL TAX INVOICE & FULFILLMENT RECEIPT
+=====================================================
+Shipment Reference:  ${order.id}
+Fulfillment Date:    ${order.date}
+Asset Specification: ${order.volume}
+Delivery Location:   ${order.destination}
+Logistics Operator:  ${order.driverName}
+Assigned Vehicle:    ${order.vehiclePlate}
+Payment Protocol:    ${order.paymentMethod}
+Fulfillment Status:  ${order.status.toUpperCase()}
+-----------------------------------------------------
+TOTAL AMOUNT SETTLED: AED ${order.cost}
+=====================================================
+Thank you for choosing Al-Waqar Transport L.L.C.
+Customer Support: support@alwaqartransport.ae
+=====================================================`;
+
+    const blob = new Blob([receiptText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${order.id}-Tax-Invoice.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const StatusBadge = ({ status }) => {
-    switch (status) {
-      case 'pending':
-        return (
-          <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 px-3 py-1 rounded-lg text-xs font-bold border border-amber-200 shadow-sm animate-pulse">
-            <Clock size={14} className="text-amber-600" /> Awaiting Dispatch
-          </span>
-        );
-      case 'active':
-        return (
-          <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 px-3 py-1 rounded-lg text-xs font-bold border border-blue-200 shadow-sm">
-            <Truck size={14} className="text-blue-600" /> Active Lease
-          </span>
-        );
-      case 'completed':
-        return (
-          <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-lg text-xs font-bold border border-emerald-200 shadow-sm">
-            <CheckCircle size={14} className="text-emerald-600" /> Completed
-          </span>
-        );
-      default:
-        return null;
+    if (['pending', 'pending review', 'scheduled'].includes(status)) {
+      return (
+        <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 px-3 py-1 rounded-lg text-xs font-bold border border-amber-200 shadow-xs">
+          <Clock size={14} className="text-amber-600" /> Pending Admin Dispatch
+        </span>
+      );
     }
+    if (['accepted', 'dispatched', 'enroute', 'arrived'].includes(status)) {
+      return (
+        <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 px-3 py-1 rounded-lg text-xs font-bold border border-blue-200 shadow-xs animate-pulse">
+          <Truck size={14} className="text-blue-600" /> Active / {status.charAt(0).toUpperCase() + status.slice(1)}
+        </span>
+      );
+    }
+    if (['completed', 'pending collection'].includes(status)) {
+      return (
+        <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-lg text-xs font-bold border border-emerald-200 shadow-xs">
+          <CheckCircle size={14} className="text-emerald-600" /> Completed & Reconciled
+        </span>
+      );
+    }
+    
+    // Default Fallback
+    return (
+      <span className="inline-flex items-center gap-1.5 bg-gray-50 text-gray-700 px-3 py-1 rounded-lg text-xs font-bold border border-gray-200 shadow-xs">
+        {status.toUpperCase()}
+      </span>
+    );
   };
 
   return (
-    <div className="w-full space-y-6 pb-12">
-      {/* Header Section with Premium Gradient Background */}
-      <div className="bg-gradient-to-r from-[#0B2A4D] via-[#103E73] to-[#0B2A4D] p-8 rounded-3xl shadow-xl text-white flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-96 bg-white/5 skew-x-12 pointer-events-none"></div>
-        <div className="space-y-2 relative z-10">
-          <div className="inline-flex items-center gap-2 bg-blue-500/30 border border-blue-400/30 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase text-blue-200">
-            <PackageOpen size={13} /> Logistics Tracking & Fulfillment
+    <div className="w-full space-y-6 pb-12 font-sans text-sm">
+       
+      {/* STANDARD PAGE HEADER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">
+            <PackageOpen size={14} /> Logistics Tracking & Fulfillment
           </div>
-          <h1 className="text-3xl font-black tracking-tight">My Orders & History</h1>
-          <p className="text-xs text-blue-100 max-w-xl leading-relaxed">
-            Manage active bulk water dispatch requests, monitor real-time delivery status, and download verified tax receipts.
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">My Water Orders History</h1>
+          <p className="text-xs text-gray-500 font-medium mt-0.5">
+            Manage bulk water dispatch requests, monitor ongoing deliveries, and review historical fulfillment archives.
           </p>
         </div>
       </div>
 
-      {/* Control Toolbar Card */}
-      <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Tabs Switcher */}
-        <div className="flex bg-gray-100 p-1.5 rounded-2xl shrink-0 border border-gray-200/60 shadow-inner">
-          <button
-            onClick={() => setActiveTab('water')}
-            className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer flex items-center gap-2 ${
-              activeTab === 'water' 
-                ? 'bg-white text-[#0B2A4D] shadow-lg scale-105' 
-                : 'text-gray-500 hover:text-gray-900'
+      {/* CONTROL TOOLBAR: ORDERED FILTERS & VISIBLE SEARCH BAR */}
+      <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+         
+        {/* Ordered Filter Pills: All, Active, Pending, Completed */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-black uppercase text-gray-400 tracking-wider mr-2">Filter:</span>
+          <button 
+            onClick={() => setStatusFilter('all')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              statusFilter === 'all' ? 'bg-[#0B2A4D] text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
             }`}
           >
-            <Droplets size={16} className={activeTab === 'water' ? 'text-blue-600' : 'text-gray-400'} /> 
-            Bulk Water Deliveries ({filteredWaterOrders.length})
+            All Dispatches ({waterOrders.length})
           </button>
-          <button
-            onClick={() => setActiveTab('rentals')}
-            className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer flex items-center gap-2 ${
-              activeTab === 'rentals' 
-                ? 'bg-white text-[#0B2A4D] shadow-lg scale-105' 
-                : 'text-gray-500 hover:text-gray-900'
+          <button 
+            onClick={() => setStatusFilter('active')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              statusFilter === 'active' ? 'bg-[#0B2A4D] text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
             }`}
           >
-            <Key size={16} className={activeTab === 'rentals' ? 'text-amber-600' : 'text-gray-400'} /> 
-            Vehicle Leases ({filteredRentalOrders.length})
+            Active
+          </button>
+          <button 
+            onClick={() => setStatusFilter('pending')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              statusFilter === 'pending' ? 'bg-[#0B2A4D] text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+            }`}
+          >
+            Pending
+          </button>
+          <button 
+            onClick={() => setStatusFilter('completed')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              statusFilter === 'completed' ? 'bg-[#0B2A4D] text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+            }`}
+          >
+            Completed
           </button>
         </div>
 
-        {/* Search & Filter Actions */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-            <input 
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search Reference ID or Destination..."
-              className="pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0B2A4D] w-72 shadow-2xs"
-            />
-          </div>
-          <button 
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer border shadow-2xs ${
-              statusFilter !== 'all' ? 'bg-blue-50 text-[#0B2A4D] border-blue-200' : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
-            }`}
-          >
-            <Filter size={14} /> Filter {statusFilter !== 'all' && `(1)`}
-          </button>
+        {/* Enhanced High-Contrast Search Input Bar */}
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-500" size={16} />
+          <input 
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search Reference ID or Destination..."
+            className="pl-10 pr-4 py-2.5 bg-white border-2 border-gray-300 focus:border-[#0B2A4D] rounded-xl text-xs font-bold text-gray-900 placeholder:text-gray-400 focus:outline-none w-72 transition shadow-2xs"
+          />
         </div>
       </div>
 
-      {/* Expandable Filter Box */}
-      {isFilterOpen && (
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-md flex items-center justify-between animate-in fade-in zoom-in duration-200">
-          <div className="flex items-center gap-4 text-xs font-bold text-gray-700">
-            <span className="flex items-center gap-1 text-gray-400 uppercase tracking-wider text-[10px]">
-              <SlidersHorizontal size={14} /> Filter Status:
-            </span>
-            <button 
-              onClick={() => setStatusFilter('all')}
-              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer font-bold ${statusFilter === 'all' ? 'bg-[#0B2A4D] text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              All Records
-            </button>
-            <button 
-              onClick={() => setStatusFilter('pending')}
-              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer font-bold ${statusFilter === 'pending' ? 'bg-[#0B2A4D] text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              Active / Pending
-            </button>
-            <button 
-              onClick={() => setStatusFilter('completed')}
-              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer font-bold ${statusFilter === 'completed' ? 'bg-[#0B2A4D] text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              Completed
-            </button>
-          </div>
-          <button 
-            onClick={() => { setStatusFilter('all'); setIsFilterOpen(false); }}
-            className="text-xs text-gray-400 hover:text-gray-600 font-bold cursor-pointer"
-          >
-            Clear Filters
-          </button>
-        </div>
-      )}
-
-      {/* Data Card Grid/List */}
+      {/* ORDERS LIST */}
       <div className="space-y-4">
-        {activeTab === 'water' && (
-          <div className="grid grid-cols-1 gap-4">
-            {filteredWaterOrders.length === 0 ? (
-              <div className="bg-white p-12 rounded-3xl text-center border border-gray-100 shadow-sm space-y-2">
-                <p className="text-sm font-bold text-gray-700">No matching water delivery records found</p>
-                <p className="text-xs text-gray-400">Try adjusting your search query or status filters.</p>
-              </div>
-            ) : (
-              filteredWaterOrders.map((order) => (
-                <div 
-                  key={order.id} 
-                  className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-                    <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#0B2A4D] flex flex-col items-center justify-center font-black shrink-0 border border-blue-100 shadow-inner">
-                      <Droplets size={22} className="text-blue-600 mb-0.5" />
-                    </div>
+        {filteredWaterOrders.length === 0 ? (
+          <div className="bg-white p-12 rounded-3xl text-center border border-gray-200 shadow-sm space-y-2">
+            <p className="text-sm font-bold text-gray-700">No matching water delivery records found</p>
+            <p className="text-xs text-gray-400">Try adjusting your search query or status filters.</p>
+          </div>
+        ) : (
+          filteredWaterOrders.map((order) => {
+            const isActive = ['accepted', 'dispatched', 'enroute', 'arrived'].includes(order.status);
 
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-black text-[#0B2A4D]">{order.id}</span>
-                        <StatusBadge status={order.status} />
-                      </div>
-                       
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-gray-500 pt-1 font-medium">
-                        <span className="flex items-center gap-1.5">
-                          <Calendar size={13} className="text-gray-400" /> {order.date}
-                        </span>
-                        <span className="flex items-center gap-1.5 font-bold text-gray-700">
-                          <Droplets size={13} className="text-blue-500" /> {order.volume}
-                        </span>
-                        <span className="flex items-center gap-1.5 truncate max-w-xs">
-                          <MapPin size={13} className="text-gray-400" /> {order.destination}
-                        </span>
-                      </div>
-                    </div>
+            return (
+              <div 
+                key={order.id} 
+                className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#0B2A4D] flex flex-col items-center justify-center font-black shrink-0 border border-blue-100 shadow-inner">
+                    <Droplets size={22} className="text-blue-600 mb-0.5" />
                   </div>
 
-                  <div className="flex items-center justify-between lg:justify-end gap-6 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-100">
-                    <div className="text-left lg:text-right">
-                      <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Amount</span>
-                      <span className="text-base font-black text-gray-900">AED {order.cost}</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-black text-[#0B2A4D]">{order.id}</span>
+                      <StatusBadge status={order.status} />
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => setSelectedOrderDetails(order)}
-                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs"
-                      >
-                        Details
-                      </button>
-
-                      {order.status === 'completed' ? (
-                        <button 
-                          onClick={() => alert(`Downloading verified tax invoice for order ${order.id}...`)}
-                          className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer border border-blue-200 shadow-2xs"
-                        >
-                          <Download size={14} /> Receipt
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => navigate('/customer/dashboard/track')}
-                          className="flex items-center gap-2 bg-[#0B2A4D] hover:bg-blue-900 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
-                        >
-                          Track Live Status <ArrowUpRight size={14} />
-                        </button>
-                      )}
+                      
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-gray-500 pt-1 font-medium">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar size={13} className="text-gray-400" /> {order.date}
+                      </span>
+                      <span className="flex items-center gap-1.5 font-bold text-gray-700">
+                        <Droplets size={13} className="text-blue-500" /> {order.volume}
+                      </span>
+                      <span className="flex items-center gap-1.5 truncate max-w-xs">
+                        <MapPin size={13} className="text-gray-400" /> {order.destination}
+                      </span>
                     </div>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        )}
 
-        {activeTab === 'rentals' && (
-          <div className="grid grid-cols-1 gap-4">
-            {filteredRentalOrders.length === 0 ? (
-              <div className="bg-white p-12 rounded-3xl text-center border border-gray-100 shadow-sm space-y-2">
-                <p className="text-sm font-bold text-gray-700">No matching vehicle lease records found</p>
-                <p className="text-xs text-gray-400">Try adjusting your search query or status filters.</p>
-              </div>
-            ) : (
-              filteredRentalOrders.map((order) => (
-                <div 
-                  key={order.id} 
-                  className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-                    <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-800 flex flex-col items-center justify-center font-black shrink-0 border border-amber-100 shadow-inner">
-                      <Key size={22} className="text-amber-600 mb-0.5" />
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-black text-[#0B2A4D]">{order.id}</span>
-                        <StatusBadge status={order.status} />
-                      </div>
-                       
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-gray-500 pt-1 font-medium">
-                        <span className="flex items-center gap-1.5">
-                          <Calendar size={13} className="text-gray-400" /> {order.date}
-                        </span>
-                        <span className="flex items-center gap-1.5 font-bold text-gray-700">
-                          <Truck size={13} className="text-amber-600" /> {order.vehicle}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <Clock size={13} className="text-gray-400" /> {order.duration}
-                        </span>
-                      </div>
-                    </div>
+                <div className="flex items-center justify-between lg:justify-end gap-6 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-100">
+                  <div className="text-left lg:text-right">
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Amount</span>
+                    <span className="text-base font-black text-gray-900">AED {order.cost}</span>
                   </div>
 
-                  <div className="flex items-center justify-between lg:justify-end gap-6 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-100">
-                    <div className="text-left lg:text-right">
-                      <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Lease Cost</span>
-                      <span className="text-base font-black text-gray-900">AED {order.cost}</span>
-                    </div>
-
+                  <div className="flex items-center gap-2">
                     <button 
-                      onClick={() => alert(`Opening digital contract PDF viewer for lease ${order.id}...`)}
-                      className="flex items-center gap-2 bg-[#0B2A4D] hover:bg-blue-900 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
+                      onClick={() => setSelectedOrderDetails(order)}
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs"
                     >
-                      <FileText size={14} /> View Digital Contract
+                      Details
                     </button>
+
+                    {order.status === 'completed' || order.status === 'pending collection' ? (
+                      <button 
+                        onClick={() => handleDownloadReceipt(order)}
+                        className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer border border-blue-200 shadow-2xs"
+                      >
+                        <Download size={14} /> Receipt
+                      </button>
+                    ) : isActive ? (
+                      <button 
+                        onClick={() => navigate(`/customer/dashboard/track/${order.rawId}`)}
+                        className="flex items-center gap-2 bg-[#0B2A4D] hover:bg-blue-900 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
+                      >
+                        Track Live Status <ArrowUpRight size={14} />
+                      </button>
+                    ) : (
+                      <span className="text-xs font-bold text-amber-700 bg-amber-50 px-4 py-2.5 rounded-xl border border-amber-200">
+                        Awaiting Dispatch
+                      </span>
+                    )}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -454,9 +390,9 @@ const CustomerMyOrders = () => {
               >
                 Close Window
               </button>
-              {selectedOrderDetails.status === 'pending' && (
+              {['accepted', 'dispatched', 'enroute', 'arrived'].includes(selectedOrderDetails.status) && (
                 <button
-                  onClick={() => { setSelectedOrderDetails(null); navigate('/customer/dashboard/track'); }}
+                  onClick={() => { setSelectedOrderDetails(null); navigate(`/customer/dashboard/track/${selectedOrderDetails.rawId}`); }}
                   className="flex-1 bg-[#0B2A4D] hover:bg-blue-900 text-white font-bold py-3 rounded-xl text-xs transition shadow-md cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Navigation size={14} /> Open Live Tracker

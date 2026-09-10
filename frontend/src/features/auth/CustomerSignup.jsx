@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom'; // Added
+import { useNavigate } from 'react-router-dom';
 import signupHero from '../../assets/images/Signup-hero.png';
 import logo from '../../assets/logo/logo.png';
 
 const CustomerSignup = () => {
-  const navigate = useNavigate(); // Initialize hook
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     fullName: '', phone: '', email: '', password: '', confirmPassword: '', otp: '', countryCode: '+971'
   });
@@ -25,11 +25,27 @@ const CustomerSignup = () => {
     if (phoneOnly.length < 7 || phoneOnly.length > 15) {
         tempErrors.phone = "Phone must be 7-15 digits";
     }
+    if (!formData.email || !formData.email.includes('@')) tempErrors.email = "Valid email is required";
     if (formData.password.length < 8) tempErrors.password = "Password must be at least 8 characters";
     if (formData.password !== formData.confirmPassword) tempErrors.confirmPassword = "Passwords do not match";
     
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
+  };
+
+  const handleSendOtp = async () => {
+    if (!formData.email || !formData.email.includes('@')) {
+      return setErrors({ email: "Enter a valid email first" });
+    }
+    setErrors({});
+    try {
+      const response = await axios.post('http://localhost:5191/api/Auth/send-otp', {
+        Email: formData.email
+      });
+      alert(response.data.message || `Verification code sent to ${formData.email}`);
+    } catch (error) {
+      alert(error.response?.data?.message || "Failed to send verification code.");
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -48,10 +64,9 @@ const CustomerSignup = () => {
         VerificationCode: formData.otp
       });
 
-      // Professional UX: Show message, wait 1.5 seconds, then redirect
       alert(response.data.message || "Registration successful!");
       setTimeout(() => {
-        navigate('/customer/dashboard');
+        navigate('/login');
       }, 1500);
 
     } catch (error) {
@@ -70,16 +85,7 @@ const CustomerSignup = () => {
     }
   };
 
-  // ... (Rest of your component UI code remains unchanged)
-  // Ensure the handleSendOtp and JSX structure are kept exactly as they were
-  const handleSendOtp = () => {
-    if (!formData.phone || formData.phone.length < 7) return setErrors({ phone: "Enter a valid phone first" });
-    alert(`Verification code sent to ${formData.countryCode} ${formData.phone}`);
-    setErrors({});
-  };
-
   return (
-    // Your existing JSX returns here...
     <div className="flex h-screen w-full bg-gray-50">
       <div className="hidden lg:flex w-1/2 relative">
         <img src={signupHero} alt="Al-Waqar Logistics" className="object-cover w-full h-full" />
@@ -112,20 +118,22 @@ const CustomerSignup = () => {
                   <option value="+92">🇵🇰 +92</option>
                 </select>
                 <input type="tel" className={`flex-1 p-3 border rounded-lg focus:border-[#2F5673] focus:ring-1 focus:ring-[#2F5673] outline-none transition ${errors.phone ? 'border-red-500' : ''}`} placeholder="50-XXXXXXX" required onChange={(e) => setFormData({...formData, phone: e.target.value})} />
-                <button type="button" onClick={handleSendOtp} className="px-4 py-2 bg-gray-100 border rounded-lg text-sm font-semibold hover:bg-gray-200 transition">Send Code</button>
               </div>
               {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Verification Code</label>
-              <input type="text" maxLength="6" placeholder="Enter 6-digit OTP" className="w-full p-3 border rounded-lg focus:border-[#2F5673] focus:ring-1 focus:ring-[#2F5673] outline-none transition" required onChange={(e) => setFormData({...formData, otp: e.target.value})} />
+              <label className="block text-sm font-medium mb-1">Email Address</label>
+              <div className="flex gap-2">
+                <input type="email" className={`flex-1 p-3 border rounded-lg focus:border-[#2F5673] focus:ring-1 focus:ring-[#2F5673] outline-none transition ${errors.email ? 'border-red-500' : ''}`} placeholder="name@example.com" required onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                <button type="button" onClick={handleSendOtp} className="px-4 py-2 bg-[#2F5673] text-white rounded-lg text-sm font-semibold hover:bg-[#1e3a4a] transition shadow-sm">Send Code</button>
+              </div>
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Email Address</label>
-              <input type="email" className={`w-full p-3 border rounded-lg focus:border-[#2F5673] focus:ring-1 focus:ring-[#2F5673] outline-none transition ${errors.email ? 'border-red-500' : ''}`} required onChange={(e) => setFormData({...formData, email: e.target.value})} />
-              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+              <label className="block text-sm font-medium mb-1">Verification Code</label>
+              <input type="text" maxLength="6" placeholder="Enter 6-digit OTP" className="w-full p-3 border rounded-lg focus:border-[#2F5673] focus:ring-1 focus:ring-[#2F5673] outline-none transition" required onChange={(e) => setFormData({...formData, otp: e.target.value})} />
             </div>
             
             <div>
@@ -152,8 +160,7 @@ const CustomerSignup = () => {
 
             <div className="text-xs text-gray-500 mt-2">
               <input type="checkbox" required className="mr-2" />
-              By clicking "Submit", you agree to our <button type="button" onClick={() => setActivePolicy('terms')} className="text-[#2F5673] underline">Terms of Service</button>, 
-              acknowledge our <button type="button" onClick={() => setActivePolicy('privacy')} className="text-[#2F5673] underline">Privacy Policy</button>, and consent to receiving notifications.
+              By clicking "Submit", you agree to our terms and conditions.
             </div>
 
             <button type="submit" disabled={isLoading} className="w-full bg-[#1e3a4a] text-white p-4 rounded-lg font-bold hover:bg-[#2c5364] transition disabled:opacity-50">

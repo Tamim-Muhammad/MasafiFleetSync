@@ -22,6 +22,7 @@ import CustomerSavedAddresses from './features/customerDashboard/CustomerSavedAd
 import CustomerSupport from './features/customerDashboard/CustomerSupport';
 import CustomerTransactionHistory from './features/customerDashboard/CustomerTransactionHistory';
 import CustomerVehicleRentals from './features/customerDashboard/CustomerVehicleRentals';
+import CustomerMyLeases from './features/customerDashboard/CustomerMyLeases'; 
 import CustomerDeliveryTrackerScreen from './features/customerDashboard/CustomerDeliveryTrackerScreen';
 import CustomerProfile from './features/customerDashboard/CustomerProfile';
 import CustomerSettings from './features/customerDashboard/CustomerSettings';
@@ -51,7 +52,7 @@ import AdminFinancials from './features/adminDashboard/AdminFinancials';
 import AdminReports from './features/adminDashboard/AdminReports';
 import AdminUsersRoles from './features/adminDashboard/AdminUsersRoles';
 import AdminSettings from './features/adminDashboard/AdminSettings';
-import AdminAnnouncements from './features/adminDashboard/AdminAnnouncements'; // Newly added Broadcast Announcements module
+import AdminAnnouncements from './features/adminDashboard/AdminAnnouncements'; 
 
 const PublicLayout = ({ children }) => (
   <>
@@ -89,6 +90,7 @@ function App() {
             <Route path="support" element={<CustomerSupport />} />
             <Route path="history" element={<CustomerTransactionHistory />} />
             <Route path="rentals" element={<CustomerVehicleRentals />} />
+            <Route path="my-leases" element={<CustomerMyLeases />} />
             <Route path="profile" element={<CustomerProfile />} />
             <Route path="settings" element={<CustomerSettings />} />
             <Route path="security" element={<CustomerSecurity />} />

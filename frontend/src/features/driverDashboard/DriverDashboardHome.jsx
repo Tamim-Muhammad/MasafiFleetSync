@@ -1,476 +1,484 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import { 
-  CheckCircle2, 
   FileText, 
   ShieldCheck, 
   Truck, 
-  MapPin, 
-  Navigation, 
-  Clock, 
-  Wallet, 
-  Calendar, 
   ArrowRight,
-  Info
+  Info,
+  Loader2,
+  LayoutDashboard,
+  TrendingUp,
+  MapPin,
+  Coffee,
+  Bell,
+  ChevronRight,
+  X,
+  Radio,
+  CheckCircle2
 } from 'lucide-react';
-
-// Fix Leaflet default marker icon issue in React
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+import axios from 'axios';
 
 const DriverDashboardHome = () => {
   const navigate = useNavigate();
+  
+  // Dynamic States
+  const [loading, setLoading] = useState(true);
+  const [activeJob, setActiveJob] = useState(null);
+  
+  // Announcement States
+  const [allAnnouncements, setAllAnnouncements] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [earnings, setEarnings] = useState({ 
+    todayNet: '0.00', 
+    todayCount: 0,
+    history: [] 
+  });
 
-  // Coordinates for Masafi / Fujairah route simulation
-  const driverPosition = [25.3048, 56.1265]; // Masafi region
-  const customerPosition = [25.1222, 56.3415]; // Delivery destination
-  const routeCoordinates = [driverPosition, [25.2100, 56.2300], customerPosition];
+  const [compliance, setCompliance] = useState({
+    status: 'Pending',
+    licenseDays: null,
+    insuranceDays: null,
+    registrationDays: null
+  });
+
+  // STRICT FIX: Only check for driverId. Absolutely NO fallbacks to user.id or hardcoded 28.
+  const getDriverId = () => {
+    const storedUser = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const localUser = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    return storedUser.driverId || localUser.driverId || null; 
+  };
+  const driverId = getDriverId();
+
+  useEffect(() => {
+    // Only fetch data if we successfully found a Driver ID
+    if (driverId) {
+      fetchDashboardData();
+      fetchAnnouncements();
+    } else {
+      setLoading(false);
+    }
+  }, [driverId]);
+
+  const fetchAnnouncements = async () => {
+    const allBroadcasts = JSON.parse(localStorage.getItem('admin_system_broadcasts') || '[]');
+    const driverAnnouncements = allBroadcasts.filter(a => 
+      !a.audience || a.audience.includes('All') || a.audience.includes('Driver')
+    );
+    setAllAnnouncements(driverAnnouncements);
+  };
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      try {
+        const jobRes = await axios.get(`http://localhost:5191/api/WaterOrders/driver/${driverId}/active`);
+        setActiveJob(jobRes.data);
+      } catch (err) {
+        if (err.response && err.response.status === 404) {
+          setActiveJob(null);
+        }
+      }
+
+      try {
+        const docRes = await axios.get(`http://localhost:5191/api/drivers/${driverId}/documents`);
+        if (docRes.data && docRes.data.documents) {
+          const docs = docRes.data.documents;
+          
+          const getDays = (keyword) => {
+            const doc = docs.find(d => d.category.toLowerCase().includes(keyword.toLowerCase()));
+            if (!doc || !doc.expiryDate) return null;
+            const expiry = new Date(doc.expiryDate);
+            const today = new Date();
+            return Math.max(0, Math.ceil((expiry - today) / (1000 * 60 * 60 * 24)));
+          };
+
+          setCompliance({
+            status: docRes.data.complianceStatus || 'Compliant',
+            licenseDays: getDays('license'),
+            insuranceDays: getDays('insurance'),
+            registrationDays: getDays('registration') 
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch compliance");
+      }
+
+      try {
+        const earnRes = await axios.get(`http://localhost:5191/api/DriverDeliveries/driver/${driverId}`);
+        if (earnRes.data && Array.isArray(earnRes.data)) {
+          const now = new Date();
+          
+          const parseSqlDate = (dateStr) => {
+            if (!dateStr) return null;
+            const d = new Date(dateStr);
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+          };
+          
+          const todayTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+          const todayRecords = earnRes.data.filter(r => parseSqlDate(r.completedAt || r.CompletedAt) === todayTime);
+          
+          let grossSum = 0;
+          todayRecords.forEach(r => grossSum += Number(r.amount || r.Amount || 0));
+          const netSum = grossSum * 0.90;
+
+          const history = [];
+          for (let i = 6; i >= 0; i--) {
+            const targetDate = new Date(now);
+            targetDate.setDate(now.getDate() - i);
+            const targetTime = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
+            
+            const dayRecords = earnRes.data.filter(r => parseSqlDate(r.completedAt || r.CompletedAt) === targetTime);
+            const dayNet = dayRecords.reduce((sum, r) => sum + (Number(r.amount || r.Amount || 0) * 0.90), 0);
+            
+            history.push({ 
+              day: targetDate.toLocaleDateString('en-US', { weekday: 'short' }), 
+              amount: dayNet 
+            });
+          }
+
+          setEarnings({
+            todayNet: netSum.toFixed(2),
+            todayCount: todayRecords.length,
+            history: history
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch earnings");
+      }
+
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="w-full h-96 flex flex-col items-center justify-center font-sans">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
+        <p className="text-slate-500 font-bold text-sm">Syncing Fleet Telemetry...</p>
+      </div>
+    );
+  }
+
+  // SAFETY GUARD: If the driver ID is totally missing, show this instead of crashing or showing Sohail
+  if (!driverId) {
+    return (
+      <div className="w-full h-96 flex flex-col items-center justify-center font-sans animate-in fade-in">
+        <div className="bg-amber-50 text-amber-600 p-5 rounded-full mb-4">
+          <ShieldCheck className="w-10 h-10" />
+        </div>
+        <h2 className="text-slate-800 font-black text-xl mb-2">Driver Profile Pending</h2>
+        <p className="text-slate-500 text-sm max-w-sm text-center">
+          Your account is active, but a driver record has not been securely linked to your profile yet. Please contact Dispatch.
+        </p>
+      </div>
+    );
+  }
+
+  const maxEarning = Math.max(...earnings.history.map(h => h.amount), 100);
+  const previewAnnouncements = allAnnouncements.slice(0, 3);
 
   return (
-    <div className="w-full space-y-6 pb-12">
+    <div className="w-full space-y-6 pb-28 font-sans animate-in fade-in duration-300 relative">
       
-      {/* 1. Compliance Status Banner */}
-      <div className="bg-white rounded-2xl p-5 shadow-xs border border-emerald-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* Top Banner Status Bar */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-blue-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
-          <div className="bg-emerald-500 text-white p-3 rounded-xl shadow-sm">
-            <ShieldCheck className="w-8 h-8" />
+          <div className="bg-blue-600 text-white p-3 rounded-xl shadow-sm">
+            <LayoutDashboard className="w-7 h-7" />
           </div>
           <div>
-            <h3 className="text-emerald-800 font-bold text-lg tracking-tight">STATUS: CLEARED FOR DISPATCH</h3>
-            <p className="text-gray-500 text-sm mt-0.5">All your documents are valid. You are good to go!</p>
-          </div>
-        </div>
-        <button 
-          onClick={() => navigate('/driver/compliance')}
-          className="bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-2xs flex items-center space-x-2 cursor-pointer"
-        >
-          <span>View Compliance Details</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* 2. Document Expiry Grid Matrix */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Driving License */}
-        <div className="bg-white p-5 rounded-2xl shadow-xs border border-gray-200 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-blue-50 text-blue-600 p-2.5 rounded-xl">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-800 text-sm">Driving License</h4>
-                <p className="text-xs text-gray-400 mt-0.5">Expiry: 17 Dec 2026</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-2xl font-black text-emerald-600">42</span>
-              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Days Left</p>
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center space-x-1.5 text-emerald-600 text-xs font-semibold">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Valid</span>
-          </div>
-        </div>
-
-        {/* Insurance */}
-        <div className="bg-white p-5 rounded-2xl shadow-xs border border-gray-200 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-blue-50 text-blue-600 p-2.5 rounded-xl">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-800 text-sm">Insurance</h4>
-                <p className="text-xs text-gray-400 mt-0.5">Expiry: 28 Jan 2026</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-2xl font-black text-blue-600">84</span>
-              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Days Left</p>
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center space-x-1.5 text-emerald-600 text-xs font-semibold">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Valid</span>
-          </div>
-        </div>
-
-        {/* Vehicle Registration */}
-        <div className="bg-white p-5 rounded-2xl shadow-xs border border-gray-200 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-amber-50 text-amber-600 p-2.5 rounded-xl">
-                <Truck className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-800 text-sm">Vehicle Registration</h4>
-                <p className="text-xs text-gray-400 mt-0.5">Expiry: 05 Feb 2026</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-2xl font-black text-amber-600">92</span>
-              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Days Left</p>
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center space-x-1.5 text-emerald-600 text-xs font-semibold">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Valid</span>
+            <h1 className="text-gray-900 font-bold text-lg tracking-tight">Driver Command Center</h1>
+            <p className="text-gray-500 text-xs mt-0.5">Live operational status, next actions, and shift performance.</p>
           </div>
         </div>
       </div>
 
-      {/* 3. Middle Section: Current Assignment & Job Progress Map / Right Side Feeds */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Compliance Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <ComplianceCard title="Driving License" days={compliance.licenseDays} onClick={() => navigate('/driver/compliance')} />
+        <ComplianceCard title="Vehicle Insurance" days={compliance.insuranceDays} onClick={() => navigate('/driver/compliance')} />
+        <ComplianceCard title="Fleet Registration" days={compliance.registrationDays} onClick={() => navigate('/driver/compliance')} />
+      </div>
+
+      {/* Balanced Two-Column Enterprise Grid Layout */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
         
-        {/* Left Column: Current Assignment Details */}
-        <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-200 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900 text-base">Current Assignment</h3>
-              <span className="bg-emerald-100 text-emerald-800 text-xs font-mono font-bold px-2.5 py-1 rounded-lg">
-                JOB #J-250518-01
-              </span>
-            </div>
-
-            <div className="space-y-4">
+        {/* Left Column: Active Assignment (or Compact Standby) + System Announcements */}
+        <div className="xl:col-span-2 space-y-6">
+          {activeJob ? (
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden text-slate-900 relative p-7 border-l-4 border-l-emerald-500 flex flex-col justify-between">
               <div>
-                <p className="text-xs text-gray-400 font-medium">Customer</p>
-                <h4 className="font-extrabold text-gray-800 text-base mt-0.5">Al Badia Construction LLC</h4>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Active Live Assignment</span>
+                  </div>
+                  <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">ORD-{activeJob.id}</span>
+                </div>
+                
+                <h2 className="text-xl font-bold mb-2 text-slate-900 leading-snug">{activeJob.deliveryAddress || 'Destination Pending'}</h2>
+                <div className="flex items-center gap-4 text-slate-500 text-xs font-medium mb-6">
+                  <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-blue-600" /> {activeJob.calculatedDistanceKm || '--'} km</span>
+                  <span>•</span>
+                  <span>{activeJob.volumeGallons?.toLocaleString() || '0'} Gallons</span>
+                </div>
               </div>
 
-              <div>
-                <p className="text-xs text-gray-400 font-medium">Service Type</p>
-                <p className="font-semibold text-gray-700 text-sm mt-0.5">Water Tanker Delivery</p>
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-medium">Telemetry connected & syncing</span>
+                <button 
+                  onClick={() => navigate('/driver/assignments')} 
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl transition-all cursor-pointer flex items-center gap-2 text-xs shadow-sm"
+                >
+                  <span>Open Job Details</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-3xl shadow-sm border border-slate-200 py-10 px-8 flex flex-col items-center justify-center relative overflow-hidden group">
+              <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+                   style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, black 1px, transparent 0)', backgroundSize: '24px 24px' }}>
               </div>
 
-              <div>
-                <p className="text-xs text-gray-400 font-medium">Volume</p>
-                <p className="font-semibold text-gray-900 text-base mt-0.5">5,000 Gallons</p>
-              </div>
-
-              <div className="pt-3 border-t border-gray-100 grid grid-cols-2 gap-4">
-                <div className="flex items-start space-x-2">
-                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-[11px] text-gray-400">Location</p>
-                    <p className="text-xs font-semibold text-gray-700">Masafi, Fujairah, UAE</p>
+              <div className="relative z-10 flex flex-col items-center text-center">
+                <div className="relative flex items-center justify-center w-16 h-16 mb-4">
+                  <div className="absolute inset-0 bg-blue-200 rounded-full animate-ping opacity-20"></div>
+                  <div className="relative bg-white text-blue-600 p-4 rounded-full shadow-md border border-blue-100">
+                    <Radio className="w-6 h-6" />
                   </div>
                 </div>
-                <div className="flex items-start space-x-2">
-                  <Navigation className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-[11px] text-gray-400">Distance</p>
-                    <p className="text-xs font-bold text-gray-800">18.6 km</p>
-                  </div>
-                </div>
-              </div>
 
-              <div className="bg-blue-50/50 p-3.5 rounded-xl border border-blue-100">
-                <div className="flex items-center space-x-2 text-blue-900 mb-1">
-                  <Clock className="w-4 h-4 text-blue-600" />
-                  <span className="text-xs font-bold">ETA</span>
-                </div>
-                <p className="text-sm font-extrabold text-gray-900">10:30 AM – 11:00 AM</p>
-                <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="text-gray-500">Order Amount</span>
-                  <span className="font-bold text-emerald-600 text-sm">AED 350.00</span>
-                </div>
-              </div>
-            </div>
-          </div>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight mb-1">Awaiting Dispatch</h3>
+                <p className="text-xs text-slate-500 max-w-sm leading-relaxed font-medium mb-5">
+                  Your vehicle is on active standby. Location services are online and visible to the central yard.
+                </p>
 
-          <button 
-            onClick={() => navigate('/driver/assignments')}
-            className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-md shadow-blue-600/20 text-sm cursor-pointer"
-          >
-            View Assignment Details
-          </button>
-        </div>
+                <div className="flex flex-wrap justify-center gap-3 mb-6">
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-sm uppercase tracking-wider">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                    GPS Active
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-sm uppercase tracking-wider">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                    Fleet Sync
+                  </span>
+                </div>
 
-        {/* Center Column: Job Progress & Real Leaflet Map */}
-        <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-200 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900 text-base">Job Progress</h3>
-              <div className="flex items-center space-x-1.5 text-blue-600 text-xs font-bold">
-                <span className="w-2 h-2 bg-blue-600 rounded-full animate-ping"></span>
-                <span>Live Tracking</span>
+                <button onClick={() => navigate('/driver/assignments')} className="bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 font-bold py-2.5 px-6 rounded-xl shadow-xs transition-all cursor-pointer text-xs">
+                  Open Job Queue
+                </button>
               </div>
             </div>
+          )}
 
-            {/* Stepper Workflow */}
-            <div className="space-y-3 mb-4">
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                  <div>
-                    <p className="text-xs font-bold text-emerald-900">Accepted</p>
-                    <p className="text-[11px] text-emerald-700">You accepted the job</p>
-                  </div>
-                </div>
-                <span className="text-xs font-mono font-semibold text-emerald-700">07:15 AM</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-50 border border-blue-200">
-                <div className="flex items-center space-x-3">
-                  <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">🚚</div>
-                  <div>
-                    <p className="text-xs font-bold text-blue-900">En Route</p>
-                    <p className="text-[11px] text-blue-700">You are on the way</p>
-                  </div>
-                </div>
-                <span className="text-xs font-mono font-semibold text-blue-700">07:28 AM</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 opacity-60">
-                <div className="flex items-center space-x-3">
-                  <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-700">Arrived at Location</p>
-                    <p className="text-[11px] text-gray-500">Mark when you reach</p>
-                  </div>
-                </div>
-                <span className="text-xs text-gray-400">--:--</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 opacity-60">
-                <div className="flex items-center space-x-3">
-                  <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-700">Payment Received</p>
-                    <p className="text-[11px] text-gray-500">Collect cash from customer</p>
-                  </div>
-                </div>
-                <span className="text-xs text-gray-400">--:--</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 opacity-60">
-                <div className="flex items-center space-x-3">
-                  <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-700">Completed</p>
-                    <p className="text-[11px] text-gray-500">Complete the job</p>
-                  </div>
-                </div>
-                <span className="text-xs text-gray-400">--:--</span>
+          {/* System Announcements anchored back underneath on the left column */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col">
+            <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
+              <h4 className="font-black text-slate-900 text-xs tracking-widest uppercase">System Announcements</h4>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] bg-blue-50 text-blue-600 font-bold px-2.5 py-1 rounded-full">{allAnnouncements.length} Live</span>
+                <button 
+                  onClick={() => setIsModalOpen(true)} 
+                  className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer flex items-center"
+                >
+                  View All <ChevronRight className="w-3 h-3 ml-0.5" />
+                </button>
               </div>
             </div>
-
-            {/* Real Leaflet Map Container */}
-            <div className="relative h-44 rounded-xl overflow-hidden border border-gray-200 z-10">
-              <MapContainer 
-                center={driverPosition} 
-                zoom={10} 
-                zoomControl={false}
-                dragging={false}
-                scrollWheelZoom={false}
-                style={{ height: '100%', width: '100%' }}
-              >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <Marker position={driverPosition}>
-                  <Popup>Your Tanker Location</Popup>
-                </Marker>
-                <Marker position={customerPosition}>
-                  <Popup>Delivery Destination</Popup>
-                </Marker>
-                <Polyline positions={routeCoordinates} color="#2563eb" weight={4} dashArray="5, 5" />
-              </MapContainer>
-
-              <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-xs px-3 py-1.5 rounded-lg shadow-sm border border-gray-100 flex items-center space-x-2 z-20">
-                <Navigation className="w-4 h-4 text-blue-600" />
-                <div>
-                  <p className="text-xs font-bold text-gray-800">23 min <span className="text-[10px] text-gray-400 font-normal">(18.6 km)</span></p>
-                  <p className="text-[10px] text-gray-500">Fastest route via E84</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Notifications & Announcements */}
-        <div className="space-y-6">
-          {/* Notifications Card */}
-          <div className="bg-white p-5 rounded-2xl shadow-xs border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-bold text-gray-900 text-sm">Notifications</h4>
-              <button onClick={() => navigate('/driver/notifications')} className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer">View All</button>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-start space-x-3 pb-3 border-b border-gray-100">
-                <div className="bg-blue-50 text-blue-600 p-2 rounded-lg mt-0.5">
-                  <Navigation className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-gray-800">New assignment received</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Job #J-250518-02</p>
-                  <span className="text-[10px] text-gray-400 mt-1 block">10 min ago</span>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3 pb-3 border-b border-gray-100">
-                <div className="bg-amber-50 text-amber-600 p-2 rounded-lg mt-0.5">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-gray-800">Vehicle registration expires in 92 days.</p>
-                  <span className="text-[10px] text-gray-400 mt-1 block">1 day ago</span>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3">
-                <div className="bg-emerald-50 text-emerald-600 p-2 rounded-lg mt-0.5">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-gray-800">Insurance document verified successfully.</p>
-                  <span className="text-[10px] text-gray-400 mt-1 block">2 days ago</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Announcements Card */}
-          <div className="bg-white p-5 rounded-2xl shadow-xs border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-bold text-gray-900 text-sm">Announcements</h4>
-              <button className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer">View All</button>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-start space-x-3 pb-3 border-b border-gray-100">
-                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[11px] text-gray-700 leading-snug">Safety First: Follow all traffic rules and ensure safe loading/unloading.</p>
-                  <span className="text-[10px] text-gray-400 mt-1 block">2 days ago</span>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full mt-1.5 shrink-0"></div>
-                <div>
-                  <p className="text-[11px] text-gray-700 leading-snug">System Maintenance on 12 May 2025 (12:00 AM - 02:00 AM).</p>
-                  <span className="text-[10px] text-gray-400 mt-1 block">3 days ago</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* 4. Bottom Row: Earnings, Schedule, and Vehicle Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Today's Earnings Ledger */}
-        <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-200 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-bold text-gray-900 text-sm">Today’s Earnings</h4>
-              <div className="bg-emerald-50 text-emerald-600 p-2 rounded-xl">
-                <Wallet className="w-5 h-5" />
-              </div>
-            </div>
-            <h3 className="text-3xl font-bold text-gray-900 tracking-tight">AED 350.00</h3>
             
-            <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-xs">
-              <span className="text-gray-500">2 Jobs Completed</span>
-              <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">Cash AED 350.00</span>
+            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+              {previewAnnouncements.length > 0 ? (
+                previewAnnouncements.map((item, idx) => {
+                  const isHighPriority = (item.title + item.message).toLowerCase().includes('maintenance') || (item.title + item.message).toLowerCase().includes('urgent');
+                  
+                  return (
+                    <div key={idx} className="flex items-start space-x-4 p-4 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-blue-100 transition-all">
+                      <div className="bg-blue-100 p-2.5 rounded-xl shrink-0">
+                        <Bell className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between">
+                          <p className="text-xs font-bold text-slate-900 leading-tight">{item.title}</p>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase">{item.time || 'Live'}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                          {item.message || item.description}
+                        </p>
+                        <div className="mt-3 flex items-center">
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                            isHighPriority 
+                              ? 'border-amber-200 text-amber-700 bg-amber-50' 
+                              : 'border-slate-200 text-slate-600 bg-white'
+                          }`}>
+                            {isHighPriority ? 'High Priority' : 'Normal Priority'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-xs text-slate-400 font-medium">No active broadcasts from dispatch.</p>
+                </div>
+              )}
             </div>
           </div>
 
-          <button 
-            onClick={() => navigate('/driver/earnings')}
-            className="mt-6 w-full bg-gray-50 hover:bg-gray-100 text-gray-800 font-semibold py-2.5 rounded-xl border border-gray-200 transition-all text-xs cursor-pointer"
-          >
-            View Earnings Summary
-          </button>
         </div>
 
-        {/* Upcoming Schedule */}
-        <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-bold text-gray-900 text-sm">Upcoming Schedule</h4>
-            <Calendar className="w-4 h-4 text-gray-400" />
-          </div>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <div>
-                <p className="text-xs font-bold text-gray-800">09 May 2025, 08:00 AM</p>
-                <p className="text-[11px] text-gray-500 mt-0.5">Water Delivery – 3,000 Gal</p>
-              </div>
-              <span className="bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-1 rounded-md">Confirmed</span>
+        {/* Right Column: Earnings Overview */}
+        <div className="space-y-6">
+          <div onClick={() => navigate('/driver/earnings')} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer group">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-black text-slate-900 text-xs tracking-widest uppercase">Earnings Overview</h4>
+              <TrendingUp className="w-4 h-4 text-slate-400 group-hover:text-emerald-500 transition-colors" />
+            </div>
+            
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Today's Net</p>
+            <div className="flex items-end gap-3 mb-6">
+              <h3 className="text-4xl font-black text-slate-900 tracking-tighter">AED {earnings.todayNet}</h3>
+              <span className="text-xs font-bold text-slate-500 mb-1.5 bg-slate-50 px-2 py-0.5 rounded-md">{earnings.todayCount} Jobs</span>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-gray-800">10 May 2025, 09:30 AM</p>
-                <p className="text-[11px] text-gray-500 mt-0.5">Water Delivery – 2,000 Gal</p>
-              </div>
-              <span className="bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-1 rounded-md">Confirmed</span>
-            </div>
-          </div>
-        </div>
+            <div className="mt-auto pt-4 border-t border-slate-100">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">7-Day Trend</p>
+              
+              <div className="flex items-end justify-between h-28 gap-1.5 pt-2">
+                {earnings.history.map((dayData, idx) => {
+                  const isToday = idx === 6;
+                  const heightPercent = (dayData.amount / maxEarning) * 100;
+                  const hasEarnings = dayData.amount > 0;
+                  
+                  return (
+                    <div key={idx} className="flex flex-col items-center justify-end w-full h-full gap-1 group/bar relative">
+                      <span className={`text-[9px] font-bold mb-1 transition-colors ${hasEarnings ? 'text-slate-700' : 'text-slate-300'}`}>
+                        {hasEarnings ? Math.round(dayData.amount) : '-'}
+                      </span>
 
-        {/* Vehicle Overview - Professionally Redesigned Banner with Integrated Image */}
-        <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-200 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-bold text-gray-900 text-sm">Vehicle Overview</h4>
-              <Truck className="w-5 h-5 text-gray-400" />
-            </div>
+                      <div className="w-full bg-slate-50 rounded-lg flex items-end h-full p-[2px] border border-slate-100 relative cursor-pointer">
+                        <div className="opacity-0 group-hover/bar:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded pointer-events-none transition-opacity whitespace-nowrap z-20 shadow-lg">
+                          AED {dayData.amount.toFixed(2)}
+                        </div>
 
-            <div className="grid grid-cols-2 gap-4 text-xs mb-4">
-              <div>
-                <p className="text-gray-400">Vehicle No.</p>
-                <p className="font-bold text-gray-800 font-mono mt-0.5">KT-78452</p>
+                        <div 
+                          className={`w-full rounded-md transition-all duration-700 ${
+                            isToday ? 'bg-emerald-500 shadow-sm' : 
+                            hasEarnings ? 'bg-blue-400 group-hover/bar:bg-blue-500' : 'bg-transparent'
+                          }`}
+                          style={{ height: `${Math.max(heightPercent, 3)}%` }}
+                        ></div>
+                      </div>
+                      
+                      <span className={`text-[9px] font-bold uppercase tracking-wider mt-1.5 ${isToday ? 'text-slate-900' : 'text-slate-400'}`}>
+                        {dayData.day}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              <div>
-                <p className="text-gray-400">Fleet Class</p>
-                <p className="font-bold text-gray-800 mt-0.5">5,000 Gallon Tanker</p>
-              </div>
-              <div>
-                <p className="text-gray-400">Chassis No.</p>
-                <p className="font-bold text-gray-800 font-mono mt-0.5">JN1BC1AR3BT022331</p>
-              </div>
-              <div>
-                <p className="text-gray-400">Year</p>
-                <p className="font-bold text-gray-800 mt-0.5">2021</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Professionally integrated banner style container for truck image */}
-          <div className="relative mt-2 overflow-hidden rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white p-3 flex items-center justify-between shadow-2xs">
-            <div className="flex items-center space-x-2.5">
-              <div className="bg-blue-600 text-white p-2 rounded-lg shadow-xs">
-                <Truck className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">Active Fleet Asset</p>
-                <p className="text-[10px] text-gray-500 font-medium">Al-Waqar Heavy Transport</p>
-              </div>
-            </div>
-            <div className="relative group overflow-hidden rounded-lg shadow-xs border border-blue-200/60 bg-white">
-              <img 
-                src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=300" 
-                alt="Water Tanker Truck" 
-                className="h-14 w-24 object-cover transform transition-transform duration-300 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-blue-900/10 pointer-events-none"></div>
             </div>
           </div>
         </div>
 
       </div>
 
+      {/* FULL ANNOUNCEMENTS MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-slate-900 text-lg">All Announcements</h3>
+                <p className="text-xs text-slate-500 font-medium mt-1">Complete history of dispatch broadcasts</p>
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(false)} 
+                className="p-2.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar bg-slate-50/50 rounded-b-3xl">
+              {allAnnouncements.map((item, idx) => {
+                const isHighPriority = (item.title + item.message).toLowerCase().includes('maintenance') || (item.title + item.message).toLowerCase().includes('urgent');
+                
+                return (
+                  <div key={idx} className="flex items-start space-x-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div className="bg-blue-50 p-3 rounded-2xl shrink-0 border border-blue-100/50">
+                      <Bell className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <p className="text-base font-bold text-slate-900 leading-none">{item.title}</p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">{item.time || 'Live'}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                        {item.message || item.description}
+                      </p>
+                      <div className="mt-4 flex items-center">
+                        <span className={`text-[9px] font-bold px-2.5 py-1 rounded-md border uppercase tracking-wider shadow-xs ${
+                          isHighPriority 
+                            ? 'border-amber-200 text-amber-700 bg-amber-50' 
+                            : 'border-slate-200 text-slate-600 bg-slate-50'
+                        }`}>
+                          {isHighPriority ? 'High Priority' : 'Normal Priority'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};
+
+const ComplianceCard = ({ title, days, onClick }) => {
+  const isCritical = days !== null && days <= 14;
+  const isExpired = days !== null && days <= 0;
+  
+  let textColor = 'text-emerald-600';
+  let badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+  let statusText = 'Valid';
+  
+  if (isExpired) {
+    textColor = 'text-red-600';
+    badgeClass = 'bg-red-50 text-red-700 border-red-100';
+    statusText = 'Expired';
+  } else if (isCritical) {
+    textColor = 'text-amber-600';
+    badgeClass = 'bg-amber-50 text-amber-700 border-amber-100';
+    statusText = 'Expiring Soon';
+  }
+
+  return (
+    <div 
+      onClick={onClick}
+      className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 flex flex-col justify-between hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">{title}</h4>
+        <span className={`text-[9px] font-bold px-2.5 py-1 rounded-md border uppercase tracking-wider ${badgeClass}`}>
+          {statusText}
+        </span>
+      </div>
+      <div className="flex items-baseline gap-1.5">
+        <span className={`text-4xl font-black tracking-tighter leading-none ${textColor}`}>
+          {days !== null ? days : '--'}
+        </span>
+        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Days Left</span>
+      </div>
     </div>
   );
 };

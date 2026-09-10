@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { 
   Bell, 
@@ -23,14 +23,32 @@ const CustomerSettings = () => {
   const [savedSettings, setSavedSettings] = useState(false);
   const isDark = darkMode;
 
+  // Load saved preferences from localStorage on mount
+  useEffect(() => {
+    const storedPreferences = JSON.parse(localStorage.getItem('customer_portal_preferences') || '{}');
+    if (storedPreferences) {
+      setSettings(prev => ({
+        ...prev,
+        ...storedPreferences
+      }));
+    }
+  }, []);
+
   const handleSave = (e) => {
     e.preventDefault();
+    
+    // Persist notification preferences permanently
+    localStorage.setItem('customer_portal_preferences', JSON.stringify(settings));
+
     setSavedSettings(true);
-    setTimeout(() => setSavedSettings(false), 2500);
+    setTimeout(() => {
+      setSavedSettings(false);
+      window.dispatchEvent(new Event('storage'));
+    }, 2500);
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-16 font-sans text-sm">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12 font-sans text-sm">
       
       {/* Consistent Blue Gradient Hero Banner */}
       <div className="bg-gradient-to-r from-[#0B2A4D] via-[#103E73] to-[#0B2A4D] p-8 rounded-3xl shadow-2xl text-white flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden border border-blue-900/50">
@@ -59,8 +77,8 @@ const CustomerSettings = () => {
         </div>
 
         {savedSettings && (
-          <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-xl flex items-center gap-2 text-emerald-400 text-xs font-semibold">
-            <CheckCircle2 className="w-4 h-4 shrink-0" /> System preferences updated successfully!
+          <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-xl flex items-center gap-2 text-emerald-400 text-xs font-semibold animate-in fade-in duration-150">
+            <CheckCircle2 className="w-4 h-4 shrink-0" /> System preferences and notification channels updated successfully!
           </div>
         )}
 
@@ -123,7 +141,7 @@ const CustomerSettings = () => {
             </span>
             <button
               type="submit"
-              className="bg-[#0B2A4D] hover:bg-blue-900 text-white font-extrabold px-6 py-3.5 rounded-2xl transition shadow-md flex items-center gap-2 cursor-pointer text-xs"
+              className="bg-[#0B2A4D] hover:bg-blue-900 text-white font-extrabold px-6 py-3.5 rounded-2xl transition shadow-md flex items-center gap-2 cursor-pointer text-xs uppercase tracking-wider"
             >
               <Save size={16} /> Save Settings
             </button>
