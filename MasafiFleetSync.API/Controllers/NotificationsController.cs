@@ -38,6 +38,7 @@ namespace MasafiFleetSync.API.Controllers
             }
 
             return await _context.Notifications
+                .Where(n => n.UserId == userId)
                 .Where(n => n.UserId == lookupId)
                 .OrderByDescending(n => n.CreatedAt)
                 .ToListAsync();
